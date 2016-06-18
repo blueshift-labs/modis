@@ -13,8 +13,13 @@ module Modis
       def all
         records = Modis.with_connection do |redis|
           ids = redis.smembers(key_for(:all))
-          redis.pipelined do
+          # Redis cluster does not support pipelining
+          if Modis.cluster_mode?
             ids.map { |id| record_for(redis, id) }
+          else
+            redis.pipelined do
+              ids.map { |id| record_for(redis, id) }
+            end
           end
         end
 
@@ -38,7 +43,12 @@ module Modis
 
         records = Modis.with_connection do |redis|
           blk = proc { |id| record_for(redis, id) }
-          ids.count == 1 ? ids.map(&blk) : redis.pipelined { ids.map(&blk) }
+          # Redis cluster does not support pipelining
+          if ids.count == 1 || Modis.cluster_mode?
+            ids.map(&blk)
+          else
+            redis.pipelined { ids.map(&blk) }
+          end
         end
 
         models = records_to_models(records)

@@ -22,6 +22,7 @@ Gem::Specification.new do |gem|
   gem.add_runtime_dependency 'redis', '>= 3.0'
   gem.add_runtime_dependency 'hiredis', '>= 0.5'
   gem.add_runtime_dependency 'connection_pool', '>= 2'
+  gem.add_runtime_dependency 'rediscluster', '>= 0.1'
 
   if defined? JRUBY_VERSION
     gem.platform = 'java'

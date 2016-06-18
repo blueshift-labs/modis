@@ -37,8 +37,10 @@ module Modis
         end
       end
 
+      # An smove operation may be performed on these keys. With redis cluster, we
+      # need to make sure these keys live on the same instance.
       def index_key(attribute, value)
-        "#{absolute_namespace}:index:#{attribute}:#{value.inspect}"
+        "{#{absolute_namespace}:index:#{attribute}}:#{value.inspect}"
       end
     end
 

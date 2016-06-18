@@ -135,13 +135,28 @@ module Modis
     end
 
     def destroy
-      self.class.transaction do |redis|
-        run_callbacks :destroy do
-          redis.pipelined do
+      if Modis.cluster_mode?
+        # Redis cluster does not support pipelining or transactions across multiple instances.
+        # For our use case with Rpush, it should be ok that destroy is not wrapped in a
+        # transaction because we are retrieving notification ids through a sorted set instead
+        # of the find_all or all methods in Modis.
+        Modis.with_connection do |redis|
+          run_callbacks :destroy do
             remove_from_indexes(redis)
             redis.srem(self.class.key_for(:all), id)
             redis.srem(self.class.sti_base_key_for(:all), id) if self.class.sti_child?
             redis.del(key)
+          end
+        end
+      else
+        self.class.transaction do |redis|
+          run_callbacks :destroy do
+            redis.pipelined do
+              remove_from_indexes(redis)
+              redis.srem(self.class.key_for(:all), id)
+              redis.srem(self.class.sti_base_key_for(:all), id) if self.class.sti_child?
+              redis.del(key)
+            end
           end
         end
       end
@@ -199,10 +214,14 @@ module Modis
       set_id if new_record?
       callback = new_record? ? :create : :update
 
-      self.class.transaction do |redis|
-        run_callbacks :save do
-          run_callbacks callback do
-            redis.pipelined do
+      if Modis.cluster_mode?
+        # Redis cluster does not support pipelining or transactions across multiple instances.
+        # For our use case with Rpush, it should be ok that persist is not wrapped in a
+        # transaction because we are retrieving notification ids through a sorted set instead
+        # of the find_all or all methods in Modis.
+        Modis.with_connection do |redis|
+          run_callbacks :save do
+            run_callbacks callback do
               attrs = coerced_attributes(persist_all)
               key = self.class.sti_child? ? self.class.sti_base_key_for(id) : self.class.key_for(id)
               future = attrs.any? ? redis.hmset(key, attrs) : :unchanged
@@ -213,6 +232,26 @@ module Modis
                 add_to_indexes(redis)
               else
                 update_indexes(redis)
+              end
+            end
+          end
+        end
+      else
+        self.class.transaction do |redis|
+          run_callbacks :save do
+            run_callbacks callback do
+              redis.pipelined do
+                attrs = coerced_attributes(persist_all)
+                key = self.class.sti_child? ? self.class.sti_base_key_for(id) : self.class.key_for(id)
+                future = attrs.any? ? redis.hmset(key, attrs) : :unchanged
+
+                if new_record?
+                  redis.sadd(self.class.key_for(:all), id)
+                  redis.sadd(self.class.sti_base_key_for(:all), id) if self.class.sti_child?
+                  add_to_indexes(redis)
+                else
+                  update_indexes(redis)
+                end
               end
             end
           end
