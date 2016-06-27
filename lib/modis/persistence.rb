@@ -194,7 +194,7 @@ module Modis
       validate(args)
       future = persist(args[:yaml_sucks])
 
-      if future && (future == :unchanged || future.value == 'OK')
+      if future && (future == :unchanged || future == 'OK')
         reset_changes
         @new_record = false
         true
@@ -258,7 +258,7 @@ module Modis
         end
       end
 
-      future
+      future.is_a?(Redis::Future) ? future.value : future
     end
 
     def coerced_attributes(persist_all)
