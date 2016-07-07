@@ -44,8 +44,9 @@ module Modis
   def self.cluster_connection
     return @cluster_connection if @cluster_connection
     @mutex.synchronize do
-      max_cached_connections = redis_options[:max_cached_connections] || redis_options[:nodes].size
-      @cluster_connection = RedisCluster.new(redis_options[:nodes], max_cached_connections)
+      max_connections = redis_options[:max_connections] || 3
+      read_slave = redis_options[:read_slave] || false
+      @cluster_connection = RedisCluster.new(redis_options[:nodes], max_connections: max_connections, read_slave: read_slave)
     end
   end
 
