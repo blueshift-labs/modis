@@ -1,7 +1,7 @@
 module Modis
   module Attribute
     TYPES = { string: [String],
-              integer: [Fixnum],
+              integer: [Integer],
               float: [Float],
               timestamp: [Time],
               hash: [Hash],
